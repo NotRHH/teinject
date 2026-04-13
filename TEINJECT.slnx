@@ -1,0 +1,11 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/teinject/">
+    <Project Path="eel/eel.vcxproj" Id="7cbdd2d8-afdd-43a3-83df-729e355a65ac" />
+    <Project Path="teinject.loader/teinject.loader.vcxproj" Id="f6a0ceb9-3bd9-42cb-8fe6-b05a82d368a9" />
+    <Project Path="teinject/teinject.vcxproj" Id="6a69f98f-0208-4d2c-bdd5-a29a7ba89508" />
+  </Folder>
+  <Project Path="example_mod/example_mod.vcxproj" />
+</Solution>

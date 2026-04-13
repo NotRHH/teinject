@@ -1,0 +1,28 @@
+//{{NO_DEPENDENCIES}}
+// Microsoft Visual C++ generated include file.
+// Used by teinject.rc
+
+// Next default values for new objects
+// 
+#ifdef APSTUDIO_INVOKED
+#ifndef APSTUDIO_READONLY_SYMBOLS
+#define _APS_NEXT_RESOURCE_VALUE        101
+#define _APS_NEXT_COMMAND_VALUE         40001
+#define _APS_NEXT_CONTROL_VALUE         1001
+#define _APS_NEXT_SYMED_VALUE           101
+#endif
+#endif
+
+#define STRINGIFY_IMPL(x) #x
+#define STRINGIFY(x) STRINGIFY_IMPL(x)
+
+
+#define DLL_VERSION_A 0
+#define DLL_VERSION_B 1
+#define DLL_VERSION_C 0
+#define DLL_VERSION_D 0
+#define DLL_VERSION_DS ""
+
+#define DLL_VERSION_STRING STRINGIFY(DLL_VERSION_A) "." STRINGIFY(DLL_VERSION_B) "." STRINGIFY(DLL_VERSION_C) "." STRINGIFY(DLL_VERSION_D) DLL_VERSION_DS
+#define DLL_VERSION_STRING_SHORT STRINGIFY(DLL_VERSION_A) "." STRINGIFY(DLL_VERSION_B) "." STRINGIFY(DLL_VERSION_C)
+
