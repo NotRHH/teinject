@@ -60,16 +60,19 @@ namespace teinject::mod_loader {
         eel::debug::log("Loading mod DLLs from {} started", MOD_DLL_DIRECTORY);
         
         auto dll_ext = std::filesystem::path(DLL_EXTENSION.c_str());
-        for (auto& fs_entry : std::filesystem::directory_iterator(MOD_DLL_DIRECTORY.c_str())) {
-            auto path = std::filesystem::absolute(fs_entry.path());
-            eel::debug::log("File: {}", path.string());
-            if (!fs_entry.is_regular_file()) continue;
-            if (path.extension() != dll_ext) continue;
-            eel::debug::log("File has appropriate extension. Attempt to load it");
-            auto lib_handle = LoadLibraryW(path.c_str());
-            if (!lib_handle) {
-                auto code = GetLastError();
-                throw std::runtime_error(std::format("Error loading mod '{}': error code {}", path.string(), code));
+        
+        if (auto mods_path = std::filesystem::path(MOD_DLL_DIRECTORY.c_str()); std::filesystem::exists(mods_path)) {
+            for (auto& fs_entry : std::filesystem::directory_iterator(mods_path)) {
+                auto path = std::filesystem::absolute(fs_entry.path());
+                eel::debug::log("File: {}", path.string());
+                if (!fs_entry.is_regular_file()) continue;
+                if (path.extension() != dll_ext) continue;
+                eel::debug::log("File has appropriate extension. Attempt to load it");
+                auto lib_handle = LoadLibraryW(path.c_str());
+                if (!lib_handle) {
+                    auto code = GetLastError();
+                    throw std::runtime_error(std::format("Error loading mod '{}': error code {}", path.string(), code));
+                }
             }
         }
         
