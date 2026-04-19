@@ -42,6 +42,16 @@ namespace external::windows {
         return GetAsyncKeyState(VK_SHIFT) & 0x8000;
     }
     
+    export 
+    bool IsCtrlPressed() {
+        return GetAsyncKeyState(VK_CONTROL) & 0x8000;
+    } 
+    
+    export
+    bool IsKeyPressed(int key) {
+        return GetAsyncKeyState(key) & 0x8000;
+    }
+    
     export
     std::tm CurrentTime() {
         auto tm = std::tm();

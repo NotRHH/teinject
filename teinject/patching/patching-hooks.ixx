@@ -3,9 +3,11 @@ export module teinject.patching:hooks;
 import std;
 import eel.injection;
 import eel.util;
+import eel.debug;
 import teinject.tein;
 import teinject.globals;
 import teinject.constants;
+import teinject.common;
 import teinject.game;
 import teinject.handlers;
 
@@ -17,24 +19,58 @@ using namespace teinject::impl;
 
 namespace teinject::patching {
     
-    void check_area_gon(saved_data& data) {
-        auto& gon = ref_to<GonObject>(data.registers.eax);
-    
-        globals::handler_registry.Apply<ILevelLoadHandler>(&ILevelLoadHandler::OnLevelLoad);
+    void load_level(saved_data& data) {
+        auto& level_file_name = ref_to<String>(data.registers.ebx + 0x8);
         
         globals::state.Reset();
         globals::custom_flags.Reset();
+        
+        globals::handler_registry.Apply<ILevelLoadHandler>(
+            &ILevelLoadHandler::OnLevelLoad,
+            LevelLoadData({
+                .full_level_name = level_file_name,
+            }));
+        
+        globals::fast_restarter.SaveCurrentLevel(level_file_name);
+    }
+    
+    void check_area_gon(saved_data& data) {
+        auto& gon = ref_to<GonObject>(data.registers.eax);
+        
         globals::custom_flags.FillProperties(gon);
     }
     
     void check_level_gon(saved_data& data) {
-        auto& gon = ref_to<GonObject>(data.registers.eax);
+        auto& main_gon = ref_to<GonObject>(data.registers.ebp - 0x18);
+        auto& area_name = ref_to<String>(data.registers.ebp - 0x48);
+        auto& level_name = ref_to<String>(data.registers.ebp - 0x78);
+        auto& level_file_name = ref_to<String>(data.registers.ebx + 0x8);
         
-        globals::custom_flags.FillProperties(gon);
+        auto& area_gon = main_gon.ExtractField(area_name);
+        auto level_gon_ref = opt<GonObject&>();
+        if (auto& level_gon = main_gon.ExtractField(area_name); level_gon.HasField(level_name)) {
+            level_gon_ref = level_gon;
+            globals::custom_flags.FillProperties(level_gon);
+        }
+        
+        globals::handler_registry.Apply<ILevelLoadHandler>(
+            &ILevelLoadHandler::OnLevelConfigLoad, 
+            LevelConfigLoadData({
+                .area_name = area_name,
+                .level_name = level_name,
+                .full_level_name = level_file_name,
+                .main_config = main_gon,
+                .area_config = area_gon,
+                .level_config = level_gon_ref,
+            }));
     }
     
     void frame_update(saved_data& data) {
         globals::handler_registry.Apply<IFrameUpdateHandler>(&IFrameUpdateHandler::OnFrameUpdate);
+        
+        if (globals::fast_restarter.IsRestartRequested()) {
+            globals::fast_restarter.RestartGame();
+        }
     }
 
     void check_hollows_water_flag(saved_data& data) {
@@ -147,6 +183,20 @@ namespace teinject::patching {
         auto& crumble_tile = ref_to<CrumbleTile>(data.registers.ecx);
         
         globals::handler_registry.Apply<ICrumbleTileUpdateHandler>(&ICrumbleTileUpdateHandler::OnUpdate, crumble_tile);
+    }
+    
+    void default_level(saved_data& data) {
+        auto set_level = [&](std::string_view level_name) {
+            static auto persistent_level_name = std::string();
+            persistent_level_name = level_name;
+            ref_to<char const*>(data.registers.esp) = persistent_level_name.data();
+            ref_to<std::size_t>(data.registers.esp + 0x4) = persistent_level_name.size();
+        };
+        
+        if (auto name = globals::fast_restarter.GetLoadedLevelName()) {
+            set_level(*name);
+            globals::fast_restarter.CleanUp();
+        }
     }
     
 }

@@ -22,12 +22,13 @@ namespace teinject::tein {
     struct DLLEXPORT String : constructible_wrapper {
         String(char const* s) { self_thiscall<0x402d70, void, char const*>(s); }
         String(char const* s, std::size_t size) { self_thiscall<0x402ec0, void, char const*, std::size_t>(s, size); }
+        explicit String(std::string_view sv) : String(sv.data(), sv.size()) {}
         auto& operator=(String const&) = delete;
         String(String const&) = delete;
         ~String() { self_thiscall<0x402ce0, void>(); }
         
         auto begin() const { return capacity_ <= 0xf ? in_place_storage_ : storage_; }
-        auto end() const { return (capacity_ <= 0xf ? in_place_storage_ : storage_) + length_; }
+        auto end() const { return begin() + length_; }
         auto size() const { return length_; }
         auto capacity() const { return capacity_; }
         auto c_str() const { return begin(); }

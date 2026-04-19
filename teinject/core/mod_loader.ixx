@@ -9,16 +9,17 @@ import <windows.h>;
 import teinject.patching;
 import external.sha256;
 
+using namespace std::literals;
 using namespace eel::util;
 
 namespace teinject::mod_loader {
     
-    constexpr auto LOG_FILE = "teinject.log"_zsv;
-    constexpr auto EXE_FILE_NAME = "TheEnd.exe"_zsv;
+    constexpr auto LOG_FILE = "teinject.log"sv;
+    constexpr auto EXE_FILE_NAME = "TheEnd.exe"sv;
     constexpr auto EXE_HASH = "6aaf25bbd9970275654e6aabd98346b9da37540044fc24b9df4368544dce3709"_bytes;
     
     void CheckExe() {
-        auto file_content = fs::read_all_bytes(EXE_FILE_NAME.c_str());
+        auto file_content = fs::read_all_bytes(EXE_FILE_NAME);
         if (!file_content) {
             throw std::runtime_error(std::format("Could not read {}", EXE_FILE_NAME));
         }
@@ -59,9 +60,8 @@ namespace teinject::mod_loader {
         
         eel::debug::log("Loading mod DLLs from {} started", MOD_DLL_DIRECTORY);
         
-        auto dll_ext = std::filesystem::path(DLL_EXTENSION.c_str());
-        
-        if (auto mods_path = std::filesystem::path(MOD_DLL_DIRECTORY.c_str()); std::filesystem::exists(mods_path)) {
+        if (auto mods_path = std::filesystem::path(MOD_DLL_DIRECTORY); std::filesystem::exists(mods_path)) {
+            auto dll_ext = std::filesystem::path(DLL_EXTENSION);
             for (auto& fs_entry : std::filesystem::directory_iterator(mods_path)) {
                 auto path = std::filesystem::absolute(fs_entry.path());
                 eel::debug::log("File: {}", path.string());

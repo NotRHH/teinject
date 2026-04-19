@@ -15,16 +15,20 @@ namespace teinject::patching {
     std::vector<patch_item> GetImplementationPatchList() {
         return init_range<std::vector>({
 patch_item {
+    "load_level",
+    std::make_unique<cpp_patch<load_level, 0x4b1df1, 0x4b1dfa, injection_mode::before>>(),
+},
+patch_item {
     "check_area_gon",
     std::make_unique<cpp_patch<check_area_gon, 0x4b32f7, 0x4b32ff, injection_mode::before>>(),
 },
 patch_item {
     "check_level_gon",
-    std::make_unique<cpp_patch<check_level_gon, 0x4b41c8, 0x4b41cd, injection_mode::before>>(),
+    std::make_unique<cpp_patch<check_level_gon, 0x4b3e6f, 0x4b3e75, injection_mode::before>>(),
 },
 patch_item {
     "frame_update",
-    std::make_unique<cpp_patch<frame_update, 0x40dfd0, 0x40dfd6, injection_mode::after>>(),
+    std::make_unique<cpp_patch<frame_update, 0x40f519, 0x40f51e, injection_mode::before>>(),
 },      
             
 patch_item {
@@ -95,10 +99,10 @@ patch_item {
     "crumble_tile_update",
     std::make_unique<cpp_patch<crumble_tile_update, 0x48bb30, 0x48bb36, injection_mode::after>>(),
 },
-// patch_item {
-//     "test",
-//     fill_nop(0x48bb82, 0x48bb89),
-// },
+patch_item {
+    "default_level",
+    std::make_unique<cpp_patch<default_level, 0x4f0722, 0x4f0729, injection_mode::after>>(),
+},
 
 
             
