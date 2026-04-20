@@ -20,6 +20,6 @@ namespace teinject::inline constants {
     export constexpr auto MOD_DLL_DIRECTORY = "./mods"sv;
     
     export constexpr auto FAST_RESTART_TEMP_PATH = "./teinject.fast_restart.txt"sv;
-    export constexpr auto FAST_RESTART_KEYS = std::array{VK_CONTROL, VK_SHIFT, VK_MENU, VK_ESCAPE};
+    export constexpr auto FAST_RESTART_KEYS = std::array{VK_CONTROL, VK_SHIFT, VK_MENU, VK_F5};
     
 }

@@ -53,6 +53,15 @@ namespace external::windows {
     }
     
     export
+    bool IsApplicationWindowFocused() {
+        auto foreground_hwnd = GetForegroundWindow();
+        DWORD foreground_pid;
+        GetWindowThreadProcessId(foreground_hwnd, &foreground_pid);
+
+        return foreground_pid == GetCurrentProcessId();
+    }
+    
+    export
     std::tm CurrentTime() {
         auto tm = std::tm();
         auto time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());

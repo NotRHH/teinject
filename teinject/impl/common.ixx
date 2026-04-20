@@ -33,8 +33,8 @@ namespace teinject::impl {
             if (index < per_instance.size()) {
                 return per_instance[index];
             }
-            if (common.has_value()) {
-                return common.value();
+            if (common) {
+                return *common;
             }
             return {};
         }
@@ -64,10 +64,10 @@ namespace teinject::impl {
     
     template<typename T>
     void FillProperty(EntityProperty<T>& property, GonObject& field) {
-        if (auto common_value = ExtractField(field, "common")) {
+        if (auto common_value = ExtractField(field, "common"_S)) {
             property.common.emplace(GetPropertyValue<T>(*common_value));
         }
-        if (auto per_instance_values = ExtractField(field, "per_instance")) {
+        if (auto per_instance_values = ExtractField(field, "per_instance"_S)) {
             property.per_instance.assign_range(*per_instance_values | std::views::transform(GetPropertyValue<T>));
         }
     }
@@ -101,7 +101,7 @@ namespace teinject::impl {
         void FillProperties(GonObject& config) {
             auto view = rfl::to_view(data_);
             view.apply([&](auto const& field) {
-                (FillPropertyFromConfig)(*field.value(), config, std::string("teinject."sv).append(field.name()).c_str());
+                (FillPropertyFromConfig)(*field.value(), config, String(std::string("teinject."sv).append(field.name())));
             });
         }
         
@@ -126,6 +126,7 @@ namespace teinject::impl {
         }
         
         bool IsRestartRequested() const {
+            if (!external::windows::IsApplicationWindowFocused()) return false;
             for (auto& key : FAST_RESTART_KEYS) {
                 if (!external::windows::IsKeyPressed(key)) return false;
             }

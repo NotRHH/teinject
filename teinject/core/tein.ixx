@@ -20,8 +20,9 @@ namespace teinject::tein {
     
     export
     struct DLLEXPORT String : constructible_wrapper {
-        String(char const* s) { self_thiscall<0x402d70, void, char const*>(s); }
-        String(char const* s, std::size_t size) { self_thiscall<0x402ec0, void, char const*, std::size_t>(s, size); }
+        String() = default;
+        explicit String(char const* s) { self_thiscall<0x402d70, void, char const*>(s); }
+        explicit String(char const* s, std::size_t size) { self_thiscall<0x402ec0, void, char const*, std::size_t>(s, size); }
         explicit String(std::string_view sv) : String(sv.data(), sv.size()) {}
         auto& operator=(String const&) = delete;
         String(String const&) = delete;
@@ -38,12 +39,17 @@ namespace teinject::tein {
         operator std::string_view() const { return std::string_view(begin(), size()); }
     private:
         union {
-            char* storage_;
+            char* storage_{};
             char in_place_storage_[0x10];
         };
-        std::size_t length_;
-        std::size_t capacity_;
+        std::size_t length_ = 0;
+        std::size_t capacity_ = 0xf;
     };
+    
+    export
+    DLLEXPORT String operator ""_S(char const* ch, std::size_t size) {
+        return String(ch, size);
+    }
     
     export
     enum struct DLLEXPORT GonObjectType {
