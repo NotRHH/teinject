@@ -8,6 +8,7 @@ import "export/dllexport-macros.h";
 import eel.injection;
 
 using namespace eel::util;
+using namespace teinject::tein;
 
 namespace teinject::inline handlers {
     
@@ -22,13 +23,48 @@ namespace teinject::inline handlers {
     };
     
     export
+    struct LevelLoadData {
+        DLLEXPORT std::string_view FullLevelName() const { return m_.full_level_name; }
+        
+        struct Members {
+            std::string_view full_level_name;
+        };
+        LevelLoadData(Members&& members) : m_(std::move(members)) {}
+    private:
+        Members m_;
+    };
+    
+    export
+    struct LevelConfigLoadData {
+        DLLEXPORT std::string_view AreaName() const { return m_.area_name; }
+        DLLEXPORT std::string_view LevelName() const { return m_.level_name; }
+        DLLEXPORT std::string_view FullLevelName() const { return m_.full_level_name; }
+        DLLEXPORT GonObject& MainConfig() const { return m_.main_config; }
+        DLLEXPORT GonObject& AreaConfig() const { return m_.area_config; }
+        DLLEXPORT opt<GonObject&> LevelConfig() const { return m_.level_config; }
+
+        struct Members {
+            std::string_view area_name;
+            std::string_view level_name;
+            std::string_view full_level_name;
+            refw<GonObject> main_config;
+            refw<GonObject> area_config;
+            opt<GonObject&> level_config;
+        };
+        LevelConfigLoadData(Members&& members) : m_(std::move(members)) {}
+    private:
+        Members m_;
+    };
+    
+    export
     struct DLLEXPORT ILevelLoadHandler : IHandler {
-        virtual void OnLevelLoad() = 0;
+        virtual void OnLevelConfigLoad(LevelConfigLoadData const& data) = 0;
+        virtual void OnLevelLoad(LevelLoadData const& data) = 0;
     };
     
     export
     struct DLLEXPORT ICrumbleTileUpdateHandler : IHandler {
-        virtual void OnUpdate(tein::CrumbleTile& tile) = 0;
+        virtual void OnUpdate(CrumbleTile& tile) = 0;
     };
     
     template<typename T>
@@ -111,17 +147,17 @@ namespace teinject::inline handlers {
             std::tuple<unsigned, unsigned, unsigned> required_teinject_version) 
         {
             if (!IsModRegistrationAllowed()) {
-                throw std::domain_error("Mods should be registered from DllMain upon attachment to process");
+                throw std::runtime_error("Mods should be registered from DllMain upon attachment to process");
             }
             
             auto& [a, b, c] = required_teinject_version;
             auto& [ra, rb, rc] = VERSION_NUM;
             if (std::tie(a, b) != std::tie(ra, rb)) {
-                throw std::domain_error(std::format("Mod requires teinject v{}.{}. Current teinject is v{}.{}", a, b, ra, rb));
+                throw std::runtime_error(std::format("Mod requires teinject v{}.{}. Current teinject is v{}.{}", a, b, ra, rb));
             }
             
             if (mods_.contains(mod_name)) {
-                throw std::domain_error("Mod with such name is already registered");
+                throw std::runtime_error("Mod with such name is already registered");
             }
             
             mods_.emplace(mod_name, mod_version);

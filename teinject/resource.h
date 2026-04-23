@@ -19,7 +19,7 @@
 
 #define DLL_VERSION_A 0
 #define DLL_VERSION_B 1
-#define DLL_VERSION_C 0
+#define DLL_VERSION_C 1
 #define DLL_VERSION_D 0
 #define DLL_VERSION_DS ""
 

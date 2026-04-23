@@ -42,6 +42,25 @@ namespace external::windows {
         return GetAsyncKeyState(VK_SHIFT) & 0x8000;
     }
     
+    export 
+    bool IsCtrlPressed() {
+        return GetAsyncKeyState(VK_CONTROL) & 0x8000;
+    } 
+    
+    export
+    bool IsKeyPressed(int key) {
+        return GetAsyncKeyState(key) & 0x8000;
+    }
+    
+    export
+    bool IsApplicationWindowFocused() {
+        auto foreground_hwnd = GetForegroundWindow();
+        DWORD foreground_pid;
+        GetWindowThreadProcessId(foreground_hwnd, &foreground_pid);
+
+        return foreground_pid == GetCurrentProcessId();
+    }
+    
     export
     std::tm CurrentTime() {
         auto tm = std::tm();

@@ -2,11 +2,14 @@ export module teinject.common;
 
 import std;
 import eel.util;
+import eel.debug;
 import zpp.bits;
 import teinject.tein;
 import teinject.constants;
 import "3rd/rfl.h";
+import external.windows;
 
+using namespace std::literals;
 using namespace eel::util;
 using namespace teinject::tein;
 
@@ -30,8 +33,8 @@ namespace teinject::impl {
             if (index < per_instance.size()) {
                 return per_instance[index];
             }
-            if (common.has_value()) {
-                return common.value();
+            if (common) {
+                return *common;
             }
             return {};
         }
@@ -61,10 +64,10 @@ namespace teinject::impl {
     
     template<typename T>
     void FillProperty(EntityProperty<T>& property, GonObject& field) {
-        if (auto common_value = ExtractField(field, "common")) {
+        if (auto common_value = ExtractField(field, "common"_S)) {
             property.common.emplace(GetPropertyValue<T>(*common_value));
         }
-        if (auto per_instance_values = ExtractField(field, "per_instance")) {
+        if (auto per_instance_values = ExtractField(field, "per_instance"_S)) {
             property.per_instance.assign_range(*per_instance_values | std::views::transform(GetPropertyValue<T>));
         }
     }
@@ -98,7 +101,7 @@ namespace teinject::impl {
         void FillProperties(GonObject& config) {
             auto view = rfl::to_view(data_);
             view.apply([&](auto const& field) {
-                (FillPropertyFromConfig)(*field.value(), config, std::string("teinject.").append(field.name()).c_str());
+                (FillPropertyFromConfig)(*field.value(), config, String(std::string("teinject."sv).append(field.name())));
             });
         }
         
@@ -106,6 +109,72 @@ namespace teinject::impl {
         
     private:
         CustomTilesetFlagsData data_{};
+    };
+    
+    export
+    struct FastRestarter {
+        FastRestarter() = default;
+        
+        void Enable(bool enable) {
+            enabled_ = enable;
+        }
+        
+        void SaveCurrentLevel(std::string_view level_file_name) {
+            if (!enabled_) return;
+            
+            static constexpr auto lvl_extension = ".lvl"sv;
+            if (level_file_name.ends_with(lvl_extension)) {
+                level_file_name.remove_suffix(lvl_extension.size());
+            } else {
+                throw std::runtime_error("no .lvl extension found");
+            }
+            current_level_name_ = level_file_name;
+        }
+        
+        bool IsRestartRequested() const {
+            if (!enabled_) return false;
+            
+            if (!external::windows::IsApplicationWindowFocused()) return false;
+            for (auto& key : FAST_RESTART_KEYS) {
+                if (!external::windows::IsKeyPressed(key)) return false;
+            }
+            return true;
+        }
+        
+        [[noreturn]] void RestartGame() {
+            if (!enabled_) return;
+            
+            fs::write_all_bytes(FAST_RESTART_TEMP_PATH, current_level_name_);
+            external::windows::LaunchProcess(LOADER_PATH, "");
+            std::quick_exit(0);
+        }
+        
+        opt<std::string_view> GetLoadedLevelName() {
+            if (!enabled_) return {};
+            
+            if (!file_read_) {
+                file_read_ = true;
+                if (auto name = fs::read_all_bytes<std::string>(FAST_RESTART_TEMP_PATH)) {
+                    fast_restart_level_name_ = *std::move(name);
+                }
+            };
+            if (!fast_restart_level_name_.empty()) {
+                return fast_restart_level_name_;
+            }
+            return {};
+        }
+        
+        void CleanUp() {
+            if (std::filesystem::exists(FAST_RESTART_TEMP_PATH)) {
+                std::filesystem::remove(FAST_RESTART_TEMP_PATH);
+            }
+        }
+        
+    private:
+        std::string current_level_name_{};
+        std::string fast_restart_level_name_{};
+        bool file_read_ = false;
+        bool enabled_ = false;
     };
     
     export

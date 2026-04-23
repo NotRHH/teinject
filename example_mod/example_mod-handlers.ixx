@@ -10,7 +10,9 @@ using namespace eel::util;
 namespace example_mod {
     
     struct ExampleLevelLoadHandler : teinject::ILevelLoadHandler {
-        void OnLevelLoad() override {
+        void OnLevelConfigLoad(teinject::LevelConfigLoadData const& data) override {}
+
+        void OnLevelLoad(teinject::LevelLoadData const& data) override {
             globals::random = {};
         }
     };
