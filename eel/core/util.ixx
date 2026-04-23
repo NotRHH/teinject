@@ -814,12 +814,12 @@ namespace eel::util {
             if (!big) throw std::invalid_argument("odd number of hexadecimal digits");
             return std::tuple(result, len);
         }();
-        static constexpr std::array<std::uint8_t, get<1>(t)> result = [] {
+        static constexpr std::array<std::byte, get<1>(t)> result = [] {
             constexpr auto raw_arr = get<0>(t);
             constexpr auto len = get<1>(t);
-            auto arr = std::array<std::uint8_t, len>();
+            auto arr = std::array<std::byte, len>();
             for (int i = 0; i < len; ++i) {
-                arr[i] = raw_arr[i];
+                arr[i] = std::byte{raw_arr[i]};
             }
             return arr;
         }();

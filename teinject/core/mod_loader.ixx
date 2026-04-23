@@ -26,7 +26,7 @@ namespace teinject::mod_loader {
         auto sha256 = external::sha256();
         sha256.update(*file_content);
         auto hash = sha256.digest();
-        if (hash != EXE_HASH) {
+        if (!std::ranges::equal(hash, EXE_HASH, {}, [](std::uint8_t b) { return std::byte{b}; })) {
             throw std::runtime_error(std::format("{} hash mismatch", EXE_FILE_NAME));
         }
     }
