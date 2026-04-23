@@ -115,7 +115,13 @@ namespace teinject::impl {
     struct FastRestarter {
         FastRestarter() = default;
         
+        void Enable(bool enable) {
+            enabled_ = enable;
+        }
+        
         void SaveCurrentLevel(std::string_view level_file_name) {
+            if (!enabled_) return;
+            
             static constexpr auto lvl_extension = ".lvl"sv;
             if (level_file_name.ends_with(lvl_extension)) {
                 level_file_name.remove_suffix(lvl_extension.size());
@@ -126,6 +132,8 @@ namespace teinject::impl {
         }
         
         bool IsRestartRequested() const {
+            if (!enabled_) return false;
+            
             if (!external::windows::IsApplicationWindowFocused()) return false;
             for (auto& key : FAST_RESTART_KEYS) {
                 if (!external::windows::IsKeyPressed(key)) return false;
@@ -134,12 +142,16 @@ namespace teinject::impl {
         }
         
         [[noreturn]] void RestartGame() {
+            if (!enabled_) return;
+            
             fs::write_all_bytes(FAST_RESTART_TEMP_PATH, current_level_name_);
             external::windows::LaunchProcess(LOADER_PATH, "");
             std::quick_exit(0);
         }
         
         opt<std::string_view> GetLoadedLevelName() {
+            if (!enabled_) return {};
+            
             if (!file_read_) {
                 file_read_ = true;
                 if (auto name = fs::read_all_bytes<std::string>(FAST_RESTART_TEMP_PATH)) {
@@ -162,6 +174,7 @@ namespace teinject::impl {
         std::string current_level_name_{};
         std::string fast_restart_level_name_{};
         bool file_read_ = false;
+        bool enabled_ = false;
     };
     
     export

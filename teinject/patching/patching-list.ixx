@@ -103,6 +103,10 @@ patch_item {
     "default_level",
     std::make_unique<cpp_patch<default_level, 0x4f0722, 0x4f0729, injection_mode::after>>(),
 },
+patch_item {
+    "fast_start",
+    std::make_unique<cpp_patch<fast_start, 0x4c0a35, 0x4c0a3c, injection_mode::before>>(),
+},
 
 
             

@@ -199,4 +199,8 @@ namespace teinject::patching {
         }
     }
     
+    void fast_start(saved_data& data) {
+        globals::fast_restarter.Enable(true);
+    }
+    
 }
