@@ -11,6 +11,12 @@ using namespace eel::util;
 
 namespace eel::injection {
     
+    constexpr std::size_t FUNCTION_ALIGNMENT = 0x10;
+    
+    constexpr std::uint8_t INSTRUCTION_INTERRUPT = 0xCC;
+    constexpr std::uint8_t INSTRUCTION_NO_OPERATION = 0x90;
+    
+    
     template<typename T>
     concept passable_by_value = std::is_lvalue_reference_v<T> || sizeof(T) <= sizeof(uintptr_t);
     
@@ -243,15 +249,15 @@ namespace eel::injection {
             scoped_unprotect(dword addr, size_t size) :
                 dest_(addr), num_bytes_(size)
             {
-                if (!VirtualProtect(ptr_to<void>(addr), size, PAGE_EXECUTE_READWRITE, &old_prot_)) {
-                    throw std::runtime_error{ "failed to unlock memory for write" };
+                if (!VirtualProtect(ptr_to<void>(dest_), num_bytes_, PAGE_READWRITE, &old_prot_)) {
+                    throw std::runtime_error(std::format("failed to unlock memory for write at {:X}", static_cast<std::uintptr_t>(dest_)));
                 }
             }
             scoped_unprotect(scoped_unprotect const&) = delete;
             scoped_unprotect& operator=(scoped_unprotect const&) = delete;
             ~scoped_unprotect() {
                 if (!VirtualProtect(ptr_to<void>(dest_), num_bytes_, old_prot_, &old_prot_)) {
-                    //throw runtime_error{ "failed to revert memory protection" };
+                    debug::exit_with_error(std::format("failed to revert memory protection at {:X}", static_cast<std::uintptr_t>(dest_)));
                 }
             }
         private:
@@ -462,7 +468,7 @@ namespace eel::injection {
             if (codecave_bounds.size() > transfer_control_opcode_size) {
                 std::memset(
                     ptr_to<void>(codecave_bounds.addr_begin + transfer_control_opcode_size),
-                    0x90,
+                    INSTRUCTION_NO_OPERATION,
                     codecave_bounds.size() - transfer_control_opcode_size);
             }
         }
@@ -507,11 +513,6 @@ namespace eel::injection {
         {
             write_jmp_back_p(initial_codecave, index, codecave_bounds.addr_end);
         }
-
-        void make_executable(std::span<std::uint8_t> initial_codecave) {
-            DWORD old_prot;
-            VirtualProtect(initial_codecave.data(), initial_codecave.size(), PAGE_EXECUTE_READWRITE, &old_prot);
-        }
         
         void initialize_codecave(
             injection_mode inj_placement,
@@ -538,7 +539,6 @@ namespace eel::injection {
                     throw std::out_of_range("initial codecave overflown");
                 }
             }
-            make_executable(initial_codecave);
 
             write_codecave(codecave_bounds, initial_codecave, inj_mode_data.codecave_transfer_op);
         }
@@ -556,16 +556,14 @@ namespace eel::injection {
                 + (inj_placement(Mode) != injection_mode::replace ? CodecaveBounds.size() : 0)
                 + settings::initial_codecave_template.size();
 
-            static void initialize() {
+            static void initialize(std::span<std::uint8_t> extra_executable_storage) {
                 (initialize_codecave)(
                     inj_placement(Mode),
                     settings::data,
                     CodecaveBounds,
-                    initial_codecave,
+                    extra_executable_storage,
                     dword(&caller<Func, typename settings::param_type, CodecaveBounds.addr_begin>));
             }
-        private:
-            alignas(0x10) static inline std::array<std::uint8_t, caller_size> initial_codecave{};
         };
     }
     
@@ -614,8 +612,9 @@ namespace eel::injection {
     export
     struct patch_base {
         
-        virtual void write_data() = 0;
+        virtual void write_data(std::span<std::uint8_t> extra_executable_storage) = 0;
         virtual std::vector<bounds_t> occupied_sections() = 0;
+        virtual std::size_t extra_executable_storage_size() { return 0; }
 
         patch_base() = default;
         patch_base(const patch_base&) = delete;
@@ -634,7 +633,7 @@ namespace eel::injection {
             chunk_v_(std::vector(std::from_range, std::forward<T>(rng)))
         {}
 
-        void write_data() override {
+        void write_data(std::span<std::uint8_t> extra_executable_storage) override {
             for (auto& chunk : chunks_span()) {
                 chunk.write_data();
             }
@@ -663,12 +662,77 @@ namespace eel::injection {
     template<auto MainFunction, uintptr_t AddrBegin, uintptr_t AddrEnd, injection_mode Mode>
     requires (address_bounds_valid_for_injection(AddrBegin, AddrEnd))
     struct cpp_patch : patch_base {
-        void write_data() override {
-            injector<MainFunction, bounds_t{AddrBegin, AddrEnd}, Mode>::initialize();
+        using injector_t = injector<MainFunction, bounds_t{AddrBegin, AddrEnd}, Mode>;
+        
+        void write_data(std::span<std::uint8_t> extra_executable_storage) override {
+            injector_t::initialize(extra_executable_storage);
         }
         
         std::vector<bounds_t> occupied_sections() override {
             return {{AddrBegin, AddrEnd}};
+        }
+
+        std::size_t extra_executable_storage_size() override {
+            return injector_t::caller_size;
+        }
+    };
+    
+    std::uintptr_t align_address_up(std::uintptr_t address, std::size_t alignment) {
+        return (address + alignment - 1) & ~(alignment - 1);
+    }
+    
+    struct executable_memory_storage_allocator {
+        explicit executable_memory_storage_allocator(std::size_t size) {
+            size = align_address_up(size, FUNCTION_ALIGNMENT);
+            if (size == 0) return;
+            if (auto ptr = VirtualAlloc(nullptr, size, MEM_COMMIT, PAGE_READWRITE)) {
+                storage_ = std::span(static_cast<std::uint8_t*>(ptr), size);
+                std::ranges::fill(storage_, INSTRUCTION_INTERRUPT);
+            } else {
+                throw std::runtime_error("executable_memory_storage_allocator: unable to allocate memory for codecaves");
+            }
+        }
+        
+        std::size_t size() const { return storage_.size(); }
+        
+        std::span<std::uint8_t> request_chunk(std::size_t size) {
+            assert_not_frozen(); 
+            auto left = used_memory_;
+            auto right = align_address_up(used_memory_ + size, FUNCTION_ALIGNMENT);
+            if (right > storage_.size()) {
+                throw std::runtime_error("executable_memory_storage_allocator: out of memory");
+            }
+            used_memory_ = right;
+            return storage_.subspan(left, right - left);
+        }
+        
+        void make_executable() {
+            assert_not_frozen();
+            DWORD prev_prot;
+            if (!VirtualProtect(storage_.data(), storage_.size(), PAGE_EXECUTE_READ, &prev_prot)) {
+                throw std::runtime_error("executable_memory_storage_allocator: failed to make memory storage executable");
+            }
+            frozen_ = true;
+        }
+        
+        executable_memory_storage_allocator(executable_memory_storage_allocator const&) = delete;
+        auto& operator =(executable_memory_storage_allocator const&) = delete;
+        ~executable_memory_storage_allocator() {
+            if (!frozen_) {
+                debug::exit_with_error("executable_memory_storage_allocator: not frozen upon destruction, access violation may occur");
+            }
+            // storage_ is not deallocated and remains valid after destruction
+        }
+        
+    private:
+        std::span<std::uint8_t> storage_{};
+        std::size_t used_memory_ = 0;
+        bool frozen_ = false;
+        
+        void assert_not_frozen() const {
+            if (frozen_) {
+                throw std::runtime_error("executable_memory_storage_allocator: memory storage was already made executable");
+            }
         }
     };
 
@@ -694,7 +758,7 @@ namespace eel::injection {
 
     export
     std::unique_ptr<raw_mem_patch> fill_nop(std::uintptr_t addr_begin, std::uintptr_t addr_end) {
-        return std::make_unique<raw_mem_patch>(mem_chunk(addr_begin, addr_end, byte_array_t(addr_end - addr_begin, 0x90)));
+        return std::make_unique<raw_mem_patch>(mem_chunk(addr_begin, addr_end, byte_array_t(addr_end - addr_begin, INSTRUCTION_NO_OPERATION)));
     }
 
 
@@ -748,7 +812,7 @@ namespace eel::injection {
             auto intersections = check_intersections();
 
             bool success = intersections.empty();
-            error_list_t errors;
+            auto errors = error_list_t();
             if (success) {
                 errors = write_patches();
                 success = errors.empty();
@@ -775,7 +839,6 @@ namespace eel::injection {
                 return x.bounds.addr_begin < y.bounds.addr_begin;
             });
 
-            using tpl = std::tuple<entry_t, entry_t>;
             auto intersections = bounds
                 | std::views::slide(2)
                 | std::views::filter([](auto const& t) {
@@ -788,17 +851,29 @@ namespace eel::injection {
         }
     
         error_list_t write_patches() const {
-            error_list_t errors{};
+            auto errors = error_list_t();
+            auto exec_mem_storage_allocator = executable_memory_storage_allocator(needed_extra_executable_memory_size());
+            debug::log("codecave storage size: {}", exec_mem_storage_allocator.size());
             for (auto& patch : collection_) {
                 try {
-                    patch->write_data();
-                } catch (const std::exception& e) {
+                    auto codecave_size = patch->extra_executable_storage_size();
+                    patch->write_data(exec_mem_storage_allocator.request_chunk(codecave_size));
+                } catch (std::exception const& e) {
                     errors.push_back({patch, e});
                 }
             }
+            exec_mem_storage_allocator.make_executable();
             return errors;
         }
         
+        std::size_t needed_extra_executable_memory_size() const {
+            auto size = 0uz;
+            for (auto& patch : collection_) {
+                size += patch->extra_executable_storage_size();
+                size = align_address_up(size, FUNCTION_ALIGNMENT);
+            }
+            return size;
+        }
     };
 
 }
